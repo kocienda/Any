@@ -12,12 +12,12 @@ NB. In this document, Any with a leading capital letter refers to the general id
 
 A list of files in the repository with descriptions.
 
-* `cyto-any.h`: My implementation of an Any class based on `std::any`.
-* `xllvm-any.h`: My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0.
-* `llvm-any.h`: The `std::any` file from the LLVM/libcxx project, version 11.0.0.
-* `xgcc-any.h`: My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.
-* `gcc-any.h`: The `std::any` file from the GCC/libstdc++ project, version 9.2.0.
-* `benchmark`: Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
+* [`cyto-any.h`](https://github.com/kocienda/Any/blob/master/cyto-any.h): My implementation of an Any class based on `std::any`.
+* [`xllvm-any.h`](https://github.com/kocienda/Any/blob/master/xllvm-any.h): My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0.
+* [`llvm-any.h`](https://github.com/kocienda/Any/blob/master/llvm-any.h): The `std::any` file from the LLVM/libcxx project, version 11.0.0.
+* [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.
+* [`gcc-any.h`](https://github.com/kocienda/Any/blob/master/gcc-any.h): The `std::any` file from the GCC/libstdc++ project, version 9.2.0.
+* [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark): Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
 * `README.md`: The file you're reading now.
 
 ## Fundamentals
@@ -131,11 +131,13 @@ private:
         
         ...
         
+        
         // set of drop functions enabled by type checks
         template <class X = T, std::enable_if_t<...>
         static void drop(void) {...}
         
         ...
+        
         
         static constexpr Actions actions = Actions(copy<T>, move<T>, drop<T>);
     };
@@ -148,6 +150,6 @@ private:
 
 ## Benchmarks
 
+I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it is harder to come up with appropriate tests than I would like. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling malloc is far more expensive than work done by the Any classes, so the benchmark winds up measuring malloc. What's more, the existing standard implementations of `std::any` are already efficient, so it's unreasonable to expect 5x speedups.
 
-
-
+That said...
