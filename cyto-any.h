@@ -52,6 +52,10 @@
 #define ANY_USE_EXCEPTIONS 0
 #endif
 
+#ifndef ANY_USE_SMALL_MEMCPY_STRATEGY
+#define ANY_USE_SMALL_MEMCPY_STRATEGY 0
+#endif
+
 #define ANY_USE(FEATURE) (defined ANY_USE_##FEATURE && ANY_USE_##FEATURE)
 
 namespace Cyto {
@@ -144,6 +148,7 @@ struct AnyActions
 template <class T>
 struct AnyTraits
 {
+#if ANY_USE(SMALL_MEMCPY_STRATEGY)
     template <class X = T, class... Args, 
         std::enable_if_t<IsStorageBufferSized<X> && std::is_trivially_copyable_v<X>, int> = 0>
     ANY_ALWAYS_INLINE
@@ -160,6 +165,15 @@ struct AnyTraits
     static X &make(Storage *s, std::in_place_type_t<X> vtype, Args &&... args) {
         return *(::new (static_cast<void *>(&s->buf)) X(std::forward<Args>(args)...));
     }
+#else  // ANY_USE(SMALL_MEMCPY_STRATEGY)
+    template <class X = T, class... Args, 
+        std::enable_if_t<IsStorageBufferSized<X> && 
+            std::is_nothrow_move_constructible_v<X>, int> = 0>
+    ANY_ALWAYS_INLINE
+    static X &make(Storage *s, std::in_place_type_t<X> vtype, Args &&... args) {
+        return *(::new (static_cast<void *>(&s->buf)) X(std::forward<Args>(args)...));
+    }
+#endif  // ANY_USE(SMALL_MEMCPY_STRATEGY)
 
     template <class X = T, class... Args, 
         std::enable_if_t<!IsStorageBufferSized<X>, int> = 0>
@@ -179,7 +193,6 @@ private:
     ANY_ALWAYS_INLINE
     static bool compare_typeid(const void *id) {
 #if ANY_USE(TYPEINFO)
-//         std::cout << "compare: " << static_cast<const std::type_info *>(id)->name() << " : " << typeid(X).name() << std::endl;
         return *(static_cast<const std::type_info *>(id)) == typeid(X);
 #else
         return (id && id == fallback_typeid<X>());
@@ -224,6 +237,7 @@ private:
     ANY_ALWAYS_INLINE
     static void copy(Storage *dst, const Storage *src) {}
 
+#if ANY_USE(SMALL_MEMCPY_STRATEGY)
     template <class X = T, 
         std::enable_if_t<IsStorageBufferSized<X> && std::is_trivially_copyable_v<X>, int> = 0>
     ANY_ALWAYS_INLINE
@@ -238,6 +252,15 @@ private:
     static void copy(Storage *dst, const Storage *src) {
         AnyTraits::make(dst, std::in_place_type_t<X>(), *static_cast<X const *>(static_cast<void const *>(&src->buf)));
     }
+#else  // ANY_USE(SMALL_MEMCPY_STRATEGY)
+    template <class X = T, 
+        std::enable_if_t<IsStorageBufferSized<X> &&
+            std::is_nothrow_move_constructible_v<X>, int> = 0>
+    ANY_ALWAYS_INLINE
+    static void copy(Storage *dst, const Storage *src) {
+        AnyTraits::make(dst, std::in_place_type_t<X>(), *static_cast<X const *>(static_cast<void const *>(&src->buf)));
+    }
+#endif   // ANY_USE(SMALL_MEMCPY_STRATEGY)
 
     template <class X = T, 
         std::enable_if_t<!IsStorageBufferSized<X>, int> = 0>
@@ -249,6 +272,7 @@ private:
     //
     // move
     //
+#if ANY_USE(SMALL_MEMCPY_STRATEGY)
     template <class X = T, 
         std::enable_if_t<std::is_same_v<X, void>, int> = 0>
     ANY_ALWAYS_INLINE
@@ -260,6 +284,14 @@ private:
     static void move(Storage *dst, Storage *src) {
         memcpy(static_cast<void *>(&dst->buf), static_cast<void *>(const_cast<StorageBuffer *>(&src->buf)), sizeof(X));
     }
+#else  // ANY_USE(SMALL_MEMCPY_STRATEGY)
+    template <class X = T, 
+        std::enable_if_t<IsStorageBufferSized<X>, int> = 0>
+    ANY_ALWAYS_INLINE
+    static void move(Storage *dst, Storage *src) {
+        AnyTraits::make(dst, std::in_place_type_t<X>(), std::move(*static_cast<X const *>(static_cast<void const *>(&src->buf))));
+    }
+#endif   // ANY_USE(SMALL_MEMCPY_STRATEGY)
 
     template <class X = T, 
         std::enable_if_t<!IsStorageBufferSized<X>, int> = 0>
