@@ -12,12 +12,12 @@ NB. In this document, Any with a leading capital letter refers to the general id
 
 A list of files in the repository with descriptions.
 
-* `cyto-any.h`: My implementation of an Any class based on `std::any`.
-* `xllvm-any.h`: My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0.
-* `llvm-any.h`: The `std::any` file from the LLVM/libcxx project, version 11.0.0.
-* `xgcc-any.h`: My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.
-* `gcc-any.h`: The `std::any` file from the GCC/libstdc++ project, version 9.2.0.
-* `benchmark`: Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
+* [`cyto-any.h`](https://github.com/kocienda/Any/blob/master/cyto-any.h): My implementation of an Any class based on `std::any`.
+* [`xllvm-any.h`](https://github.com/kocienda/Any/blob/master/xllvm-any.h): My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0.
+* [`llvm-any.h`](https://github.com/kocienda/Any/blob/master/llvm-any.h): The `std::any` file from the LLVM/libcxx project, version 11.0.0.
+* [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.
+* [`gcc-any.h`](https://github.com/kocienda/Any/blob/master/gcc-any.h): The `std::any` file from the GCC/libstdc++ project, version 9.2.0.
+* [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark): Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
 * `README.md`: The file you're reading now.
 
 ## Fundamentals
@@ -131,11 +131,13 @@ private:
         
         ...
         
+        
         // set of drop functions enabled by type checks
         template <class X = T, std::enable_if_t<...>
         static void drop(void) {...}
         
         ...
+        
         
         static constexpr Actions actions = Actions(copy<T>, move<T>, drop<T>);
     };
