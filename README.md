@@ -150,6 +150,6 @@ private:
 
 ## Benchmarks
 
+I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it is harder to come up with appropriate tests than I would like. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling malloc is far more expensive than work done by the Any classes, so the benchmark winds up measuring malloc. What's more, the existing standard implementations of `std::any` are already efficient, so it's unreasonable to expect 5x speedups.
 
-
-
+That said...
