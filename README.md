@@ -8,6 +8,10 @@ I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any
 
 NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while_ `std::any` refers to the specific embodiment of this notion, as offered in C++17.
 
+## Files
+
+A list and description of files in the repository. Details to come.
+
 ## Fundamentals
 
 The `std::any` class is a type-safe container for "empty" values, as well as for values of types that are _[CopyConstructible](https://en.cppreference.com/w/cpp/named_req/CopyConstructible)_, the API provides a family of `any_cast` functions to access these stored values, and the standard encourages implementations to avoid heap allocations for small objects that are _[NoThrowMoveConstructible](https://en.cppreference.com/w/cpp/types/is_move_constructible)_.
@@ -24,7 +28,7 @@ The versions of `std::any` in LLVM/libcxx and GCC/libstdc++ share a similar plan
 
 ## Details
 
-Both LLVM/libcxx and GCC/libstdc++ `std::any` implementations have essentially two code paths, one for small values copied into the internal storage buffer, and another for large values where the memory the hold the values lives "externally" on the heap. The selection of small/internal or large/external is done in the `std::any` constructor by using [type support](https://en.cppreference.com/w/cpp/types) [SFNIAE](https://en.cppreference.com/w/cpp/language/sfinae) checks on the type of value passed into the constructor to instantiate a specific template. Each templates contains a static handle/manage function that switches on "actions" for type-checking, copying, moving, and destructing values based on whether the value is a small/internal or large/external type. The `std::any` constructor stores the pointer to this static function in the newly-created instance as it also completes the work to create the correct type-erased storage for the passed-in value. Later on, since none of the other functions in the `std::any` API are templates, and thus have no way to specify the means to deal with the type the `std::any` instance stores, it's the pointer to this static template function that holds the key to the type-appropriate code that makes a `std::any` instance work after it's been constructed.
+Both LLVM/libcxx and GCC/libstdc++ `std::any` implementations have essentially two code paths, one for small values copied into the internal storage buffer, and another for large values where the memory the hold the values lives "externally" on the heap. The selection of small/internal or large/external is done in the `std::any` constructor by using C++ [type support](https://en.cppreference.com/w/cpp/types) facilities and [SFNIAE](https://en.cppreference.com/w/cpp/language/sfinae) checks on the type of value passed into the constructor to instantiate a specific template. Each templates contains a static handle/manage function that switches on "actions" for type-checking, copying, moving, and destructing values based on whether the value is a small/internal or large/external type. The `std::any` constructor stores the pointer to this static function in the newly-created instance as it also completes the work to create the correct type-erased storage for the passed-in value. Later on, since none of the other functions in the `std::any` API are templates, and thus have no way to specify the means to deal with the type the `std::any` instance stores, it's the pointer to this static template function that holds the key to the type-appropriate code that makes a `std::any` instance work after it's been constructed.
 
 A pseudo-code sketch of this design looks as follows:
 
