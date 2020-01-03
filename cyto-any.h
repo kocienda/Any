@@ -309,32 +309,37 @@ public:
 class Any;
 
 template <class V, class T = std::decay_t<V>>
-using IsAnyConstructible = 
+using IsAnyConstructible_ = 
     std::bool_constant<!std::is_same_v<T, Any> && !IsInPlaceType<V> && 
         std::is_copy_constructible_v<T>>;
 
+template <class V> constexpr bool IsAnyConstructible = IsAnyConstructible_<V>::value;
+
 template <class T, class U, class ...Args>
-using IsAnyInitializerListConstructible = 
+using IsAnyInitializerListConstructible_ = 
     std::bool_constant<std::is_constructible_v<T, std::initializer_list<U> &, Args...> && 
         std::is_copy_constructible_v<T>>;
+
+template <class T, class U, class ...Args> constexpr bool IsAnyInitializerListConstructible = 
+    IsAnyInitializerListConstructible_<T, U, Args...>::value;
 
 class Any
 {
 public:
     constexpr Any() noexcept : actions(VoidAnyActions) {}
 
-    template <class V, class T = std::decay_t<V>, std::enable_if_t<IsAnyConstructible<V>{}, int> = 0>
+    template <class V, class T = std::decay_t<V>, std::enable_if_t<IsAnyConstructible<V>, int> = 0>
     Any(V &&v) : actions(&AnyTraits<T>::actions) {
         AnyTraits<T>::make(&storage, std::in_place_type_t<T>(), std::forward<V>(v));
     }
 
-    template <class V, class... Args, class T = std::decay_t<V>, std::enable_if_t<IsAnyConstructible<T>{}, int> = 0>
+    template <class V, class... Args, class T = std::decay_t<V>, std::enable_if_t<IsAnyConstructible<T>, int> = 0>
     explicit Any(std::in_place_type_t<V> vtype, Args &&... args) : actions(&AnyTraits<T>::actions) {
         AnyTraits<T>::make(&storage, vtype, std::forward<Args>(args)...);
     }
 
     template <class V, class U, class ...Args, class T = std::decay_t<V>, 
-        std::enable_if_t<IsAnyInitializerListConstructible<T, U, Args...>{}, int> = 0>
+        std::enable_if_t<IsAnyInitializerListConstructible<T, U, Args...>, int> = 0>
     explicit Any(std::in_place_type_t<V> vtype, std::initializer_list<U> list, Args &&... args) :
         actions(&AnyTraits<T>::actions) {
         AnyTraits<T>::make(&storage, vtype, V{list, std::forward<Args>(args)...});
@@ -368,7 +373,7 @@ public:
         return *this;
     }
     
-    template <class V, class T = std::decay_t<V>, std::enable_if_t<IsAnyConstructible<T>{}, int> = 0>
+    template <class V, class T = std::decay_t<V>, std::enable_if_t<IsAnyConstructible<T>, int> = 0>
     Any &operator=(V &&v) {
         *this = Any(std::forward<V>(v));
         return *this;
@@ -387,7 +392,7 @@ public:
     }
 
     template <class V, class U, class... Args, class T = std::decay_t<V>,
-        std::enable_if_t<IsAnyInitializerListConstructible<T, U, Args...>{}, int> = 0>
+        std::enable_if_t<IsAnyInitializerListConstructible<T, U, Args...>, int> = 0>
     T &emplace(std::initializer_list<U> list, Args &&... args) {
         reset();
         actions = &AnyTraits<T>::actions;
