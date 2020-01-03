@@ -48,7 +48,7 @@ static void std_any_test(benchmark::State &state)
         A a1 = i;    
         A a2(a1);    
         A a3 = a1;
-        Trivial v2 = std::any_cast<Trivial>(a3);
+        int v2 = std::any_cast<int>(a3);
         r = v2;
     }
     int x;
@@ -66,7 +66,7 @@ static void xllvm_any_test(benchmark::State &state)
         A a1 = i;    
         A a2(a1);    
         A a3 = a1;
-        Trivial v2 = XLLVM::any_cast<Trivial>(a3);
+        int v2 = std::any_cast<int>(a3);
         r = v2;
     }
     int x;
@@ -84,7 +84,7 @@ static void xgcc_any_test(benchmark::State &state)
         A a1 = i;    
         A a2(a1);    
         A a3 = a1;
-        Trivial v2 = XGCC::any_cast<Trivial>(a3);
+        int v2 = std::any_cast<int>(a3);
         r = v2;
     }
     int x;
@@ -102,7 +102,7 @@ static void cyto_any_test(benchmark::State &state)
         A a1 = i;    
         A a2(a1);    
         A a3 = a1;
-        Trivial v2 = Cyto::any_cast<Trivial>(a3);
+        int v2 = std::any_cast<int>(a3);
         r = v2;
     }
     int x;
