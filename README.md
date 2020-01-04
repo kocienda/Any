@@ -210,4 +210,4 @@ It turns out that [optimization #1](#optimization-1) yields no improvement, sinc
 
 ## That's All, Folks
 
-If you've read down this far, I hope you've found this project interesting. Feel free to leave your questions or comments here, or find me on Twitter: @kocienda.
+If you've read down this far, I hope you've found this project interesting. Feel free to leave your questions or comments here, or find me on Twitter: [@kocienda](https://twitter.com/kocienda).
