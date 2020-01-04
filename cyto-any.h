@@ -1,5 +1,7 @@
 //
-// cyto-any.h
+// cyto-any.h 
+//
+// A class modeled on std::any.
 //
 // MIT License
 // 
