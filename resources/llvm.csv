@@ -1,0 +1,8 @@
+Performance of Cyto::Any vs std::any from LLVM/libcxx
+,std::any   Pct,Cyto::Any  Pct,XLLVM::Any Pct,XGCC::Any Pct,std::any Time,Cyto::Any Time,XLLVM::Any Time,XGCC::Any Time
+int-test,100,57.5,126.8,79.5,12.7,7.3,16.1,10.1
+trivial-test,100,53.3,102.9,73.0,13.7,7.3,14.1,10
+non-trivial-test,100,55.3,106.0,1119.2,30.2,16.7,32,338
+non-trivial-string-test,100,97.0,101.6,101.9,372,361,378,379
+needs-alloc-test,100,98.2,99.7,97.9,388,381,387,380
+omnibus-test,100,75.9,108.8,568.1,69,52.4,75.1,392
