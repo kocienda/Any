@@ -166,7 +166,8 @@ The simple goal of running these benchmarks was to determine how well my two opt
 * [`omnibus.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/omnibus.cpp): Uses all the types mentioned above to see how well an Any instance can change from holding one type to another type during its lifetime.
 
 ### Tests Files
-The tests I ran are included in the [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark) subdirectory of this repository for your study. I leave it as an exercise for the reader to set up compilers and Google benchmark.
+
+The tests I ran are included in the [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark) subdirectory of this repository for your study. I leave it as an exercise for you to set up compilers and Google benchmark if you're interested in running these tests yourself.
 
 ### Host
 
