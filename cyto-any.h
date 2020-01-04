@@ -469,7 +469,7 @@ public:
     }
 #endif
 
-    template <class V, class T> friend T *any_cast(Any *a) noexcept;
+    template <class V> friend std::remove_cv_t<std::remove_reference_t<V>> *any_cast(Any *a) noexcept;
 
 private:
     static constexpr AnyActions _VoidAnyActions = AnyActions();
@@ -531,8 +531,9 @@ const T *any_cast(const Any *a) noexcept {
     return any_cast<V>(const_cast<Any *>(a));
 }
 
-template <class V, class T = std::remove_cv_t<std::remove_reference_t<V>>>
-T *any_cast(Any *a) noexcept {
+template <class V>
+std::remove_cv_t<std::remove_reference_t<V>> *any_cast(Any *a) noexcept {
+    using T = std::remove_cv_t<std::remove_reference_t<V>>;
     using U = std::decay_t<V>;
     if (a && a->has_value()) {
         void *p = a->actions->get(&a->storage, 

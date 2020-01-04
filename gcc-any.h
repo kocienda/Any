@@ -38,7 +38,7 @@
 #include <utility>
 #include <type_traits>
 
-namespace std _GLIBCXX_VISIBILITY(default)
+namespace std
 {
 _GLIBCXX_BEGIN_NAMESPACE_VERSION
 

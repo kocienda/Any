@@ -298,6 +298,7 @@ struct SmallHandler
             case Action::TypeInfo:
                 return get_type_info();
         }
+        return nullptr;
     }
 
     template <class ...Args>
@@ -366,15 +367,22 @@ struct LargeHandler
         case Action::TypeInfo:
             return get_type_info();
         }
+        return nullptr;
     }
 
     template <class ...Args>
     XLLVM_ALWAYS_INLINE
     static T &create(Any & dst, Args &&... args) {
+#if defined(__clang__)
         typedef std::allocator<T> _Alloc;
         typedef std::__allocator_destructor<_Alloc> D;
         _Alloc a;
         std::unique_ptr<T, D> hold(a.allocate(1), D(a, 1));
+#else
+        typedef std::allocator<T> _Alloc;
+        _Alloc a;
+        std::unique_ptr<T> hold(a.allocate(1));
+#endif
         T* ret = ::new ((void *)hold.get()) T(std::forward<Args>(args)...);
         dst.s.ptr = hold.release();
         dst.h = &LargeHandler::handle;
