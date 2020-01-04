@@ -3,6 +3,7 @@
 //
 // A lightly-edited rewrite of the std::any class from the
 // GNU ISO C++ Library, version 9.2.0
+// https://github.com/kocienda/Any
 //
 
 // <any> -*- C++ -*-
