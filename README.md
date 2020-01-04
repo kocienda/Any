@@ -199,7 +199,7 @@ I compiled and ran the tests with two different compilers:
 
 Each compiler used the C++ standard library it shipped with, hence the baseline used for each compiler is what you, the programmer, would get if you did an `#include <any>` and created an instance of `std::any`.
 
-To run the tests, I turned off all networking on my machine, and quit all applications other than the terminal, then I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as speedy as possible taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range—within a couple percent—always use the fastest time for a given test. It's a good number to chase.
+To run the tests, I turned off all networking on my machine, and quit all applications other than the terminal, then I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as speedy as possible taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. Barring other concerns, like bugs, as long as the other times are within a range of a couple percent, always use the fastest time for a given test. It's a good number to chase.
 
 ### Results
 
@@ -207,7 +207,7 @@ The results show that `Cyto::Any` consistently equals or outperforms the standar
 
 ![Performance of Cyto::Any vs std::any from LLVM/libcxx and GCC/libstdc++](https://github.com/kocienda/Any/blob/master/resources/benchmark-chart.png)
 
-The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size, but, in my opinion, it's too miserly a tradeoff, given the performance cliff the software falls off once `malloc` is called.
+The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size. However, in my opinion, it's too miserly a tradeoff, given the performance cliff the software falls off once `malloc` is called.
 
 Otherwise, `Cyto::Any` is fastest. GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
 
