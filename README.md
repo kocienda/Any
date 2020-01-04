@@ -1,9 +1,9 @@
 # Any
 
 <a name="introduction"></a>
-I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own. I based my work on a study of the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects.
+I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own, one that runs faster than the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects. I started my work by reading through theirs. You can learn a lot by studying the experts.
 
-My [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class runs faster than the LLVM/libcxx and GCC/libstdc++ versions of `std::any`, approaching 2x faster for some common usage patterns, and even more in other cases. I'm publishing my code and results here for your comment and use, as well as your confirmation or refutation.
+The [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class I wrote with does indeed run faster, approaching 2x faster for some common usage patterns according to my tests, and even more in other cases. I'm publishing my code and results here for your comment and use, as well as for your confirmation or refutation.
 
 NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while_ `std::any` refers to the specific API and embodiment of this notion as offered in C++17.
 
@@ -12,10 +12,10 @@ NB. In this document, Any with a leading capital letter refers to the general id
 A list of files in the repository with descriptions.
 
 * [`cyto-any.h`](https://github.com/kocienda/Any/blob/master/cyto-any.h): My implementation of an Any class based on `std::any`.
-* [`xllvm-any.h`](https://github.com/kocienda/Any/blob/master/xllvm-any.h): My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0.
-* [`llvm-any.h`](https://github.com/kocienda/Any/blob/master/llvm-any.h): The `std::any` file from the LLVM/libcxx project, version 11.0.0.
-* [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.
-* [`gcc-any.h`](https://github.com/kocienda/Any/blob/master/gcc-any.h): The `std::any` file from the GCC/libstdc++ project, version 9.2.0.
+* [`xllvm-any.h`](https://github.com/kocienda/Any/blob/master/xllvm-any.h): My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0. This file is meant for study and for inclusion as a standalone header.
+* [`llvm-any.h`](https://github.com/kocienda/Any/blob/master/llvm-any.h): The unedited `std::any` file from the LLVM/libcxx project, version 11.0.0.
+* [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.  This file is meant for study and for inclusion as a standalone header.
+* [`gcc-any.h`](https://github.com/kocienda/Any/blob/master/gcc-any.h): The unedited `std::any` file from the GCC/libstdc++ project, version 9.2.0.
 * [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark): Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
 * `README.md`: The file you're reading now.
 
@@ -35,11 +35,11 @@ The versions of `std::any` in LLVM/libcxx and GCC/libstdc++ share a similar plan
 
 ## Details
 
-Both LLVM/libcxx and GCC/libstdc++ `std::any` implementations have essentially two code paths, one for small values copied into the internal storage buffer, and another for large values where the memory the hold the values is dynamically allocated on the heap. The selection of small/internal or large/external is done in the `std::any` constructor by using C++ [type support](https://en.cppreference.com/w/cpp/types) facilities and [SFNIAE](https://en.cppreference.com/w/cpp/language/sfinae) checks on the type of value passed into the constructor to instantiate a specific template. 
+Both LLVM/libcxx and GCC/libstdc++ `std::any` implementations have essentially two code paths, one for small values copied into the internal storage buffer, and another for large values where the memory the hold the values is dynamically allocated on the heap. The selection of small/internal or large/external strategies is done in the `std::any` constructor by using C++ [type support](https://en.cppreference.com/w/cpp/types) facilities and [SFNIAE](https://en.cppreference.com/w/cpp/language/sfinae) checks to instantiate a specific template. 
 
 Each template contains a static handle/manage function that switches on "actions" for type-checking, copying, moving, and destructing values based on whether the value is a small/internal or large/external type. The `std::any` constructor stores the pointer to this static function in the newly-created instance as it also completes the work to create the correct type-erased storage for the passed-in value. 
 
-As an `std::any` instance goes through its lifecycle, it's the pointer to this static template function that provides the necessary type-appropriate code. This function pointer needs to be set up in the constructor, since none of the other functions in the `std::any` API are templates, and thus have no way to specify the type that the `std::any` instance stores.
+As an `std::any` instance goes through its lifecycle, it's the pointer to this static template function that provides the necessary type-appropriate code to do the work of the class. This function pointer needs to be set up in the constructor, since none of the other functions in the `std::any` API are templates, and thus have no efficient way to access the type that the `std::any` instance stores.
 
 A pseudo-code sketch of this design looks as follows:
 
@@ -74,13 +74,13 @@ private:
 };
 ```
 
-For a more complete embodiment of this design, see my lightly edited rewrites of the LLVM/libcxx and GCC/libstdc++ `std::any` classes. See the `xllvm-any.h` and `xgcc-any.h` files in this repository, respectively.
+For more complete embodiments of this design, review the LLVM/libcxx and GCC/libstdc++ `std::any` classes I've included in this repository, as well as my lightly edited rewrites of the same: `xllvm-any.h` and `xgcc-any.h`.
 
-N.B. As I did these rewrites, I tried to remain true to the flow of the originals, but I took the liberty of changing names and removing underscores to make a more reader-friendly formatting than seems _de rigeur_ for standard library implementations.
+N.B. As I did these rewrites, I tried to remain true to the flow of the originals, but I took the liberty of changing names and removing underscores to make a more reader-friendly formatting than seems customary for standard library implementations.
 
 ## Optimization
 
-As I studied this code, I thought of two possible improvements, which I've implemented in a class called Any in `cyto-any.h` in this repository.
+As I studied this code, I thought of two possible improvements, which I've implemented in a class called Cyto::Any in `cyto-any.h` in this repository.
 
 <a name="optimization-1"></a>
 1. The addition of Action functions for values that are trivial in one of two ways. If a value is [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable), it can be copied and moved with `memcpy`. If a value is [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), its destructor function does no work. In effect, this creates an third _trivial/internal_ code path in addition to small/internal and large/external.
@@ -202,11 +202,13 @@ The results show that Cyto::Any consistently equals or outperforms the standard 
 
 The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size, but, in my opinion, is too miserly a tradeoff, given the performance cliff that the code falls off once `malloc` is called.
 
-Otherwise, Cyto::Any is fastest, and GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
+Otherwise, Cyto::Any is fastest. GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
 
 Note that the speed improvement in Cyto::Any is wholly attributable to [optimization #2](#optimization-2), the "actions structure" optimization. It's easy to see the code-generation improvement to go along with the benchmark numbers using tools like [Compiler Explorer](https://godbolt.org) and [Hopper Disassembler](https://www.hopperapp.com). Replacing the switch statement yields better code.
 
-It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate equivalent code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures.
+It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures.
+
+In the end, I left Cyto::Any the `memcpy` optimization in the source, but it's compiled out by default, controlled by the `ANY_USE_SMALL_MEMCPY_STRATEGY` macro.
 
 ## That's All, Folks
 
