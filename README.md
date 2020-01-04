@@ -12,9 +12,9 @@ NB. In this document, Any with a leading capital letter refers to the general id
 A list of files in the repository with descriptions.
 
 * [`cyto-any.h`](https://github.com/kocienda/Any/blob/master/cyto-any.h): My implementation of an Any class based on `std::any`.
-* [`xllvm-any.h`](https://github.com/kocienda/Any/blob/master/xllvm-any.h): My lightly-editing and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0. This file is meant for study and for inclusion as a standalone header.
+* [`xllvm-any.h`](https://github.com/kocienda/Any/blob/master/xllvm-any.h): My lightly-edited and reformatted version of `std::any` from the LLVM/libcxx project, version 11.0.0. This file is meant for study.
 * [`llvm-any.h`](https://github.com/kocienda/Any/blob/master/llvm-any.h): The unedited `std::any` file from the LLVM/libcxx project, version 11.0.0.
-* [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.  This file is meant for study and for inclusion as a standalone header.
+* [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-edited and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0. This file is meant for study.
 * [`gcc-any.h`](https://github.com/kocienda/Any/blob/master/gcc-any.h): The unedited `std::any` file from the GCC/libstdc++ project, version 9.2.0.
 * [`any-types.h`](https://github.com/kocienda/Any/tree/master/any-types.h): Some simple structs used as Any values in tests.
 * [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark): Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
@@ -30,7 +30,7 @@ The versions of `std::any` in LLVM/libcxx and GCC/libstdc++ share a similar plan
 
 * A set of internal functions to manage type-checking and the lifecycle of values (e.g. constructing, copying, moving, destructing).
 
-* A reliance on templates and compile-time checks to choose code paths to handle values of different types, thus limiting the need for runtime checks and the associated computation.
+* A reliance on templates and compile-time checks to choose code paths to handle values of different types, thus limiting the need for runtime checks and the associated computational overhead.
 
 * A use of only one additional machine word (on top of the three already used by the _Storage_ union) to point to a function that handles the type-checking and value-lifecycle work, thus keeping the `sizeof(std::any)` as small as possible.
 
@@ -82,7 +82,7 @@ N.B. As I did these rewrites, I tried to remain true to the flow of the original
 
 ## Optimization
 
-As I studied this code, I thought of two possible improvements, which I've implemented in a class called `Cyto::Any` in `cyto-any.h` in this repository.
+As I studied this code, I thought of two possible improvements, which I've implemented in a class called `Cyto::Any`. See `cyto-any.h` in this repository.
 
 1. <a name="optimization-1">The</a> addition of Action functions for values that are trivial in one of two ways. If a value is [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable), it can be copied and moved with `memcpy`. If a value is [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), its destructor function does no work. In effect, this creates an third _trivial/internal_ code path in addition to small/internal and large/external.
 
@@ -93,6 +93,7 @@ As I studied this code, I thought of two possible improvements, which I've imple
 class PseudoAny {
 public:
     
+    // Instantiate a Traits template and extract the pointer to its Actions structure.
     template <class T> 
     PseudoAny(T &&t) : actions(&Traits<T>::actions) {}
 
@@ -147,7 +148,9 @@ private:
         static constexpr Actions actions = Actions(copy<T>, move<T>, drop<T>);
     };
     
-    // This pointer can reference a variety of functions for different types.
+    // This pointer can reference a variety of functions for different types
+    // while also being a single concrete type itself so it can serve as 
+    // a member variable for the non-templated Any class.
     const Actions *actions;
 };
 ```
@@ -157,7 +160,7 @@ private:
 
 I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it was more difficult to come up with appropriate tests than I would have liked. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling `malloc` is far more expensive than work done by the Any classes, so the benchmark winds up measuring `malloc`. I tried to avoid this by doing little work other than running Any instances through their lifecycle by constructing, assigning, copying, and destructing them.
 
-The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. how much faster (or slower) my `Cyto::Any` class is compared to the `std::any` implementations available in the LLVM and GCC standard libraries.
+The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. the performance of `Cyto::Any` relative to the `std::any` implementations available in the LLVM and GCC standard libraries.
 
 
 ### Test Descriptions
@@ -194,16 +197,15 @@ I compiled and ran the tests with two different compilers:
 
 ### Methodology
 
-Each compiler used the C++ standard library it shipped with, hence the baseline used for each compiler is what you, the programmer, would get if you did an `#include <any>` and instantiated an instance of `std::any`.
+Each compiler used the C++ standard library it shipped with, hence the baseline used for each compiler is what you, the programmer, would get if you did an `#include <any>` and created an instance of `std::any`.
 
-To run the tests, I turned off all networking on my machine, and quit all applications other than the terminal, then I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as speedy as possible taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range—give or take a couple percent—always use the fastest time for a given test.
+To run the tests, I turned off all networking on my machine, and quit all applications other than the terminal, then I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as speedy as possible taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range—within a couple percent—always use the fastest time for a given test. It's a good number to chase.
 
 ### Results
 
 The results show that `Cyto::Any` consistently equals or outperforms the standard library implementations in all tests with both compilers.
 
-![Performance of Cyto::Any vs std::any from LLVM/libcxx](https://github.com/kocienda/Any/blob/master/resources/llvm-chart.png)
-![Performance of Cyto::Any vs std::any from GCC/libstdc++](https://github.com/kocienda/Any/blob/master/resources/gcc-chart.png)
+![Performance of Cyto::Any vs std::any from LLVM/libcxx and GCC/libstdc++](https://github.com/kocienda/Any/blob/master/resources/benchmark-chart.png)
 
 The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size, but, in my opinion, it's too miserly a tradeoff, given the performance cliff the software falls off once `malloc` is called.
 
