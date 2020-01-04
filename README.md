@@ -3,7 +3,7 @@
 <a name="introduction"></a>
 I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own, one that runs faster than the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects. I started my work by reading through theirs. You can learn a lot by studying the experts.
 
-The [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class I wrote with does indeed run faster, approaching 2x faster for some common usage patterns according to my tests, and even more in other cases. I'm publishing my code and results here for your comment and use, as well as for your confirmation or refutation.
+The [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class I wrote does indeed run faster, approaching 2x faster for some common usage patterns according to my tests, even more in other cases, and this is thanks to an optimization idea I describe below. I'm publishing my code and results here for your comment and use, as well as for your confirmation or refutation.
 
 NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while_ `std::any` refers to the specific API and embodiment of this notion as offered in C++17.
 
@@ -16,6 +16,7 @@ A list of files in the repository with descriptions.
 * [`llvm-any.h`](https://github.com/kocienda/Any/blob/master/llvm-any.h): The unedited `std::any` file from the LLVM/libcxx project, version 11.0.0.
 * [`xgcc-any.h`](https://github.com/kocienda/Any/blob/master/xgcc-any.h): My lightly-editing and reformatted version of `std::any` from the GCC/libstdc++ project, version 9.2.0.  This file is meant for study and for inclusion as a standalone header.
 * [`gcc-any.h`](https://github.com/kocienda/Any/blob/master/gcc-any.h): The unedited `std::any` file from the GCC/libstdc++ project, version 9.2.0.
+* [`any-types.h`](https://github.com/kocienda/Any/tree/master/any-types.h): Some simple structs used as Any values in tests.
 * [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark): Micro benchmark tests that use [Google benchmark](https://github.com/google/benchmark).
 * `README.md`: The file you're reading now.
 
@@ -151,9 +152,9 @@ private:
 
 ## Benchmarks
 
-I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it was more difficult to come up with appropriate tests than I would have liked. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling malloc is far more expensive than work done by the Any classes, so the benchmark winds up measuring malloc. I tried to avoid this by doing little work other than running Any instances through their lifecycle by constructing, assigning, copying, and destructing them.
+I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it was more difficult to come up with appropriate tests than I would have liked. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling `malloc` is far more expensive than work done by the Any classes, so the benchmark winds up measuring `malloc`. I tried to avoid this by doing little work other than running Any instances through their lifecycle by constructing, assigning, copying, and destructing them.
 
-The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. how much faster (or slower) my Cyto::Any class is compared to the `std::any` implementation available for a given compiler and C++ library.
+The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. how much faster (or slower) my Cyto::Any class is compared to the `std::any` implementations available in the LLVM and GCC standard libraries.
 
 
 ### Test Descriptions
@@ -191,7 +192,7 @@ Each compiler used the C++ standard library it shipped with, hence the baseline 
 
 ### Methodology
 
-After turning off all networking on my machine, and quitting all applications other than the terminal, I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as fast taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range, always use the shortest time.
+After turning off all networking on my machine, and quitting all applications other than the terminal, I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as fast taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range—give or take a couple percent—always use the shortest time.
 
 ### Results
 
@@ -206,9 +207,7 @@ Otherwise, Cyto::Any is fastest. GCC's `std::any` is more efficient than LLVM's 
 
 Note that the speed improvement in Cyto::Any is wholly attributable to [optimization #2](#optimization-2), the "actions structure" optimization. It's easy to see the code-generation improvement to go along with the benchmark numbers using tools like [Compiler Explorer](https://godbolt.org) and [Hopper Disassembler](https://www.hopperapp.com). Replacing the switch statement yields better code.
 
-It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures.
-
-In the end, I left Cyto::Any the `memcpy` optimization in the source, but it's compiled out by default, controlled by the `ANY_USE_SMALL_MEMCPY_STRATEGY` macro.
+It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures. In the end, I left Cyto::Any the `memcpy` optimization in the source, but it's compiled out by default, controlled by the `ANY_USE_SMALL_MEMCPY_STRATEGY` macro.
 
 ## That's All, Folks
 
