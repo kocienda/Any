@@ -200,7 +200,7 @@ The results show that `Cyto::Any` consistently equals or outperforms the standar
 ![Performance of Cyto::Any vs std::any from LLVM/libcxx](https://github.com/kocienda/Any/blob/master/resources/llvm-chart.png)
 ![Performance of Cyto::Any vs std::any from GCC/libstdc++](https://github.com/kocienda/Any/blob/master/resources/gcc-chart.png)
 
-The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size, but, in my opinion, is too miserly a tradeoff, given the performance cliff that the code falls off once `malloc` is called.
+The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size, but, in my opinion, it's too miserly a tradeoff, given the performance cliff the software falls off once `malloc` is called.
 
 Otherwise, `Cyto::Any` is fastest. GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
 
