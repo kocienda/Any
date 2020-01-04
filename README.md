@@ -1,10 +1,9 @@
 # Any
-Implementation and optimization of std::any
 
 <a name="introduction"></a>
-## Introduction
+I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own. I based my work on a study of the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects.
 
-I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own. I based my work on a study of the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects. In the process, I've developed what I believe to be new efficiencies, and I'm publishing them here for your comment and use, as well as your support or refutation.
+My [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class runs faster than the LLVM/libcxx and GCC/libstdc++ versions of `std::any`, approaching 2x faster for some common usage patterns and even more in other cases, and I'm publishing my code and results here for your comment and use, as well as your confirmation or refutation.
 
 NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while_ `std::any` refers to the specific API and embodiment of this notion as offered in C++17.
 
@@ -150,6 +149,46 @@ private:
 
 ## Benchmarks
 
-I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it is harder to come up with appropriate tests than I would like. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling malloc is far more expensive than work done by the Any classes, so the benchmark winds up measuring malloc. What's more, the existing standard implementations of `std::any` are already efficient, so it's unreasonable to expect 5x speedups.
+I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it was more difficult to come up with appropriate tests than I would have liked. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling malloc is far more expensive than work done by the Any classes, so the benchmark winds up measuring malloc. I tried to avoid this by doing little work other than running Any instances through their lifecycle by constructing, assigning, copying, and destructing them.
 
-That said...
+The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. how much faster (or slower) my Cyto::Any class is compared to the `std::any` implementation available for a given compiler and C++ library.
+
+
+### Test Descriptions
+
+* [`int-test.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/int-test.cpp): Uses `int` values to test small-value code paths.
+* [`trivial-test.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/trivial-test.cpp): Uses a "trivial" structure that is [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable) and [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), again to small-value code paths.
+* [`non-trivial-test.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/non-trivial-test.cpp): Uses a "non-trivial" structure that is not [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable) or [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), but is `sizeof(2 * void *)`, to see how "small" an implementation's small-value limit is.
+* [`non-trivial-string-test.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/non-trivial-string-test.cpp): Uses a "non-trivial" structure that is not [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable), or [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), but is `sizeof(4 * void *)`, and uses a `std::string`, surely a commonly-used type for an Any implementation.
+* [`needs-alloc-test.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/needs-alloc-test.cpp): Uses a "non-trivial" structure that is not [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable) and  [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), but is `sizeof(4 * void *)`, to ensure that the "large" code path is taken, and heap allocations are done to store values in an Any instance.
+* [`omnibus.cpp`](https://github.com/kocienda/Any/blob/master/benchmark/omnibus.cpp): Uses all the types mentioned above to see how well an Any instance can change from holding one type to another type during its lifetime.
+
+### Tests Files
+The tests I ran are included in the [`benchmark`](https://github.com/kocienda/Any/tree/master/benchmark) subdirectory of this repository for your study. I leave it as an exercise for the reader to set up compilers and Google benchmark.
+
+### Host
+
+I ran all tests on a MacBook Pro (16-inch, 2019), with macOS Catalina (10.15.2/19C57). Google benchmark reported my machine as having:
+```
+16 X 2300 MHz CPUs
+CPU Caches:
+  L1 Data 32 KiB (x8)
+  L1 Instruction 32 KiB (x8)
+  L2 Unified 256 KiB (x8)
+  L3 Unified 16384 KiB (x1)
+```
+
+### Compilers
+
+I compiled and ran the tests with two different compilers: 
+1. ```Apple clang version 11.0.0 (clang-1100.0.33.12), Target: x86_64-apple-darwin19.2.0```
+2. ```gcc version 9.2.0 (Homebrew GCC 9.2.0_3)```
+Each compiler used the C++ standard library it shipped with.
+
+The 
+
+### Methodology
+
+After turning off all networking on my machine, and quitting all applications other than the terminal, I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as fast taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range, always use the shortest time.
+
+### Results
