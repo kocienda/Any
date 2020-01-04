@@ -1,9 +1,9 @@
 # Any
 
 <a name="introduction"></a>
-I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own, one that runs faster than the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects. I started my work by reading through theirs. You can learn a lot by studying the experts.
+I'm fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/any), and by the prospect of using a strongly-typed language to create a class to hold values of any type. This document and the code in this repository describes my investigations into the details of making an "Any" implementation of my own, one that runs faster than the standard library implementations of `std::any` in the [LLVM/libcxx](https://github.com/llvm-mirror/libcxx/blob/master/include/any) and [GCC/libstdc++](https://github.com/gcc-mirror/gcc/blob/master/libstdc%2B%2B-v3/include/std/any) projects. I started my work by reading through theirs, and I learned a lot by studying the experts.
 
-The [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class I wrote does indeed run faster, approaching 2x faster for some common usage patterns according to my tests, even more in other cases, and this is thanks to an optimization idea I describe below. I'm publishing my code and results here for your comment and use, as well as for your confirmation or refutation.
+The [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class I wrote does indeed run faster, approaching 2x faster for some common usage patterns according to my tests, even more in other cases. This is thanks to an optimization idea I describe below, a riff on [virtual function tables](https://en.wikipedia.org/wiki/Virtual_method_table). I'm publishing my code and results here for your comment and use, as well as for your confirmation or refutation.
 
 NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while_ `std::any` refers to the specific API and embodiment of this notion as offered in C++17.
 
@@ -52,13 +52,14 @@ public:
     PseudoAny(T &&t) : handler(&Handler<T>::handle) {...}
 
     ~PseudoAny() {
-        // call the handler function, passing the appropriate action code
+        // Call the handler function, passing the appropriate action code.
         handler(Action::Drop, ...);
     }
 
 private:
     enum Action { Copy, Move, Drop... };
 
+    // Calls the appropriate function by switching on the Action code.
     template <class T> struct Handler {
         static void handle(Action action, ...) {
             switch (action) {
@@ -69,8 +70,8 @@ private:
         }
     };
     
-    // function pointer from the small/internal or large/external 
-    // template is stored in the PseudoAny instance for later use
+    // Function pointer from the small/internal or large/external 
+    // template is stored in the PseudoAny instance for later use.
     void (*handler)(Action, ...);
 };
 ```
@@ -85,7 +86,7 @@ As I studied this code, I thought of two possible improvements, which I've imple
 
 1. <a name="optimization-1">The</a> addition of Action functions for values that are trivial in one of two ways. If a value is [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable), it can be copied and moved with `memcpy`. If a value is [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), its destructor function does no work. In effect, this creates an third _trivial/internal_ code path in addition to small/internal and large/external.
 
-2. <a name="optimization-2">The</a> replacement of the function pointer member variable with a pointer to an actions structure ("Actions") containing four function pointers. The "trick" behind this optimization is to arrange for the Actions structure to be `static constexpr`, and created by a templated "Traits" class that requires the type of the value passed to the Any constructor. It's the job of the Traits class to produce the Actions structure free of type dependencies, which makes it possible to store a `const Actions *` directly as a member variable in the Any class. This eliminates the `std::any` call to through the switch statement for copy, move, etc. actions, replacing it with a call through a function pointer stored in the Actions structure.
+2. <a name="optimization-2">The</a> replacement of the function pointer member variable with a pointer to an actions structure ("Actions") containing a collection of function pointers. The "trick" behind this optimization is to arrange for the Actions structure to be `static constexpr`, and created by a templated "Traits" class that is instantiated with the type of the value passed to the Any constructor. It's the job of the Traits class to produce the Actions structure free of type dependencies, which makes it possible to store a `const Actions *` directly as a member variable in the Any class. This eliminates the `std::any` call through the switch statement for copy, move, etc. actions, replacing it with a call through a function pointer stored in the Actions structure. This is like a hand-coded [vtable](https://en.wikipedia.org/wiki/Virtual_method_table). The crucial point is that member variables in the Any class must be of the same concrete type, but must be able to work with values of all types. The compile-time setup of the function pointers in the actions structure makes this possible.
 
 
 ```c++
@@ -96,7 +97,7 @@ public:
     PseudoAny(T &&t) : actions(&Traits<T>::actions) {}
 
     ~PseudoAny() {
-        // call the appropriate function stored in the Actions struct
+        // Call the appropriate function stored in the Actions struct.
         actions->drop(...);
     }
 
@@ -117,6 +118,8 @@ private:
 
     template <class T> struct Traits {
         
+        // The set of available functions for the copy operation
+        // Each class T must resolve to one and only one function.
         template <class X = T, std::enable_if_t<IsSmall<X> && std::is_trivially_copyable_v<X>...>
         static void copy(void) {...}
 
@@ -125,25 +128,26 @@ private:
         
         template <class X = T, std::enable_if_t<IsLarge<X>...>
         static void copy(void) {...}
+        
 
-        // set of move functions enabled by type checks
+        // The set of move functions enabled by type checks.
         template <class X = T, std::enable_if_t<...>
         static void move(void) {...}
         
         ...
         
         
-        // set of drop functions enabled by type checks
+        // The set of drop functions enabled by type checks.
         template <class X = T, std::enable_if_t<...>
         static void drop(void) {...}
         
         ...
         
-        
+        // Selects a function implementation for each action based on the type of T.
         static constexpr Actions actions = Actions(copy<T>, move<T>, drop<T>);
     };
     
-    // 
+    // This pointer can reference a variety of functions for different types.
     const Actions *actions;
 };
 ```
@@ -205,7 +209,7 @@ The only results that cause some surprise is the GCC `std::any` performance on "
 
 Otherwise, `Cyto::Any` is fastest. GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
 
-Note that the speed improvement in `Cyto::Any` is wholly attributable to [optimization #2](#optimization-2), the "actions structure" optimization. It's easy to see the code-generation improvement to go along with the benchmark numbers using tools like [Compiler Explorer](https://godbolt.org) or [Hopper Disassembler](https://www.hopperapp.com). Replacing the switch statement helps the compiler generate smaller and more efficient code.
+Note that the speed improvement in `Cyto::Any` is wholly attributable to [optimization #2](#optimization-2), the _Actions structure_ optimization (_atable_). It's easy to see the code-generation improvement to go along with the benchmark numbers using tools like [Compiler Explorer](https://godbolt.org) or [Hopper Disassembler](https://www.hopperapp.com). Perhaps this code piggybacks on devirtualization optimizations compilers already have to make virtual function dispatch faster, but I don't know enough about compiler internals to say for sure. In any case, replacing the switch statement helps the compiler to generate smaller and more efficient code. 
 
 It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures. In the end, I left the `memcpy` optimization in the `Cyto::Any` source, but it's compiled out by default, controlled by the `ANY_USE_SMALL_MEMCPY_STRATEGY` macro.
 
