@@ -81,13 +81,12 @@ N.B. As I did these rewrites, I tried to remain true to the flow of the original
 
 ## Optimization
 
-As I studied this code, I thought of two possible improvements, which I've implemented in a class called Cyto::Any in `cyto-any.h` in this repository.
+As I studied this code, I thought of two possible improvements, which I've implemented in a class called `Cyto::Any` in `cyto-any.h` in this repository.
 
-<a name="optimization-1"></a>
-1. The addition of Action functions for values that are trivial in one of two ways. If a value is [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable), it can be copied and moved with `memcpy`. If a value is [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), its destructor function does no work. In effect, this creates an third _trivial/internal_ code path in addition to small/internal and large/external.
+1. <a name="optimization-1">The</a> addition of Action functions for values that are trivial in one of two ways. If a value is [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable), it can be copied and moved with `memcpy`. If a value is [_TriviallyDestructible_](https://en.cppreference.com/w/cpp/types/is_destructible), its destructor function does no work. In effect, this creates an third _trivial/internal_ code path in addition to small/internal and large/external.
 
-<a name="optimization-2"></a>
-2. The replacement of the function pointer member variable with a pointer to an actions structure ("Actions") containing four function pointers. The "trick" behind this optimization is to arrange for the Actions structure to be `static constexpr`, and created by a templated "Traits" class that requires the type of the value passed to the Any constructor. It's the job of the Traits class to produce the Actions structure free of type dependencies, which makes it possible to store a `const Actions *` directly as a member variable in the Any class. From the standpoint of the source code, this has the effect of eliminating the `std::any` call to through the switch statement for copy, move, etc. actions, replacing it with a call through a function pointer stored in the Actions structure. This change seems to help the compiler generate smaller and more efficient code.
+2. <a name="optimization-2">The</a> replacement of the function pointer member variable with a pointer to an actions structure ("Actions") containing four function pointers. The "trick" behind this optimization is to arrange for the Actions structure to be `static constexpr`, and created by a templated "Traits" class that requires the type of the value passed to the Any constructor. It's the job of the Traits class to produce the Actions structure free of type dependencies, which makes it possible to store a `const Actions *` directly as a member variable in the Any class. This eliminates the `std::any` call to through the switch statement for copy, move, etc. actions, replacing it with a call through a function pointer stored in the Actions structure.
+
 
 ```c++
 class PseudoAny {
@@ -154,7 +153,7 @@ private:
 
 I used [Google benchmark](https://github.com/google/benchmark) to test my optimization ideas, however it was more difficult to come up with appropriate tests than I would have liked. Since `std::any` is merely a holder of data, rather than a function or algorithm that produces a result (like a sort routine), it's easy to write tests that exercise the wrong things. For example, calling `malloc` is far more expensive than work done by the Any classes, so the benchmark winds up measuring `malloc`. I tried to avoid this by doing little work other than running Any instances through their lifecycle by constructing, assigning, copying, and destructing them.
 
-The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. how much faster (or slower) my Cyto::Any class is compared to the `std::any` implementations available in the LLVM and GCC standard libraries.
+The simple goal of running these benchmarks was to determine how well my two optimization ideas fared, i.e. how much faster (or slower) my `Cyto::Any` class is compared to the `std::any` implementations available in the LLVM and GCC standard libraries.
 
 
 ### Test Descriptions
@@ -188,26 +187,26 @@ I compiled and ran the tests with two different compilers:
 1. ```Apple clang version 11.0.0 (clang-1100.0.33.12), Target: x86_64-apple-darwin19.2.0```
 2. ```gcc version 9.2.0 (Homebrew GCC 9.2.0_3)```
 
-Each compiler used the C++ standard library it shipped with, hence the baseline used for each compiler is what you, the programmer, would get if you did an `#include <any>` and instantiated an instance of `std::any`.
-
 ### Methodology
 
-After turning off all networking on my machine, and quitting all applications other than the terminal, I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as fast taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range—give or take a couple percent—always use the shortest time.
+Each compiler used the C++ standard library it shipped with, hence the baseline used for each compiler is what you, the programmer, would get if you did an `#include <any>` and instantiated an instance of `std::any`.
+
+To run the tests, I turned off all networking on my machine, and quit all applications other than the terminal, then I ran each test twenty (20) times. The numbers I report are the **minimum** value from the test run. That's right, the **single fastest time seen**, not a mean, median, or mode, or any statistical calculation. My experience many years ago working at Apple trying to make the Safari 1.0 web browser as speedy as possible taught me that the fastest number is always what you want, since that number tells how fast the code can go when it's as free from system noise as you can get. As long as the other times are within a consistent range—give or take a couple percent—always use the fastest time for a given test.
 
 ### Results
 
-The results show that Cyto::Any consistently equals or outperforms the standard library implementations in all tests with both compilers.
+The results show that `Cyto::Any` consistently equals or outperforms the standard library implementations in all tests with both compilers.
 
 ![Performance of Cyto::Any vs std::any from LLVM/libcxx](https://github.com/kocienda/Any/blob/master/resources/llvm-chart.png)
 ![Performance of Cyto::Any vs std::any from GCC/libstdc++](https://github.com/kocienda/Any/blob/master/resources/gcc-chart.png)
 
 The only results that cause some surprise is the GCC `std::any` performance on "smallish" values which is attributable to the implementation choice to consider small values as one machine word only. Obviously, this saves on size, but, in my opinion, is too miserly a tradeoff, given the performance cliff that the code falls off once `malloc` is called.
 
-Otherwise, Cyto::Any is fastest. GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
+Otherwise, `Cyto::Any` is fastest. GCC's `std::any` is more efficient than LLVM's `std::any` except where the latter benefits from its more liberal definition of "small" values.
 
-Note that the speed improvement in Cyto::Any is wholly attributable to [optimization #2](#optimization-2), the "actions structure" optimization. It's easy to see the code-generation improvement to go along with the benchmark numbers using tools like [Compiler Explorer](https://godbolt.org) and [Hopper Disassembler](https://www.hopperapp.com). Replacing the switch statement yields better code.
+Note that the speed improvement in `Cyto::Any` is wholly attributable to [optimization #2](#optimization-2), the "actions structure" optimization. It's easy to see the code-generation improvement to go along with the benchmark numbers using tools like [Compiler Explorer](https://godbolt.org) or [Hopper Disassembler](https://www.hopperapp.com). Replacing the switch statement helps the compiler generate smaller and more efficient code.
 
-It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures. In the end, I left Cyto::Any the `memcpy` optimization in the source, but it's compiled out by default, controlled by the `ANY_USE_SMALL_MEMCPY_STRATEGY` macro.
+It turns out that [optimization #1](#optimization-1) yields no improvement, since the compilers are smart enough to generate code equivalent to the handwritten `memcpy` if the structures in the source code are [_TriviallyCopyable_](https://en.cppreference.com/w/cpp/types/is_trivially_copyable). I don't show these results in the graphs or charts, since there's nothing interesting to see, but it's worth saying that compilers (and compiler-writers) are smart about trivial structures. In the end, I left the `memcpy` optimization in the `Cyto::Any` source, but it's compiled out by default, controlled by the `ANY_USE_SMALL_MEMCPY_STRATEGY` macro.
 
 ## That's All, Folks
 
