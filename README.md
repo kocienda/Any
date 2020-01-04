@@ -181,11 +181,11 @@ CPU Caches:
 ### Compilers
 
 I compiled and ran the tests with two different compilers: 
+
 1. ```Apple clang version 11.0.0 (clang-1100.0.33.12), Target: x86_64-apple-darwin19.2.0```
 2. ```gcc version 9.2.0 (Homebrew GCC 9.2.0_3)```
-Each compiler used the C++ standard library it shipped with.
 
-The 
+Each compiler used the C++ standard library it shipped with, hence the baseline used for each compiler is what you, the programmer, would get if you did an `#include <any>` and instantiated an instance of `std::any`.
 
 ### Methodology
 
