@@ -5,7 +5,7 @@ I’m fascinated by C++ [`std::any`](https://en.cppreference.com/w/cpp/utility/a
 
 The [`Cyto::Any`](https://github.com/kocienda/Any/blob/master/cyto-any.h) class I wrote does indeed run faster, approaching 2x faster for some common usage patterns according to my tests, even more in other cases. This is thanks to an optimization idea I describe below, a riff on [virtual function tables](https://en.wikipedia.org/wiki/Virtual_method_table). I’m publishing my code and results here for your comment and use, as well as for your confirmation or refutation.
 
-NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while_ `std::any` refers to the specific API and embodiment of this notion as offered in C++17.
+NB. In this document, Any with a leading capital letter refers to the general idea of a class capable of holding values regardless of type, including my own implementation, while `std::any` refers to the specific API and embodiment of this notion as offered in C++17.
 
 ## Files
 
